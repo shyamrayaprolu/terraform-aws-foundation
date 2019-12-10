@@ -2,11 +2,26 @@
 
 ### Summary
 
+### Modules
+
+### Examples
+
+
+# v0.9.9
+
+### Summary
+
+New feature for `asg` module and bugfix for `tf-cloud-credentials` module.
 
 ### Modules
 
+* `asg`: Allow ASG instances to have additional EBS block devices
+* `tf-cloud-credentials`: Switch the module to use a datasource to lookup an
+  existing TF Cloud workspace instead of trying to create one.
 
 ### Examples
+
+* No changes.
 
 
 # v0.9.8
@@ -20,7 +35,8 @@
 * `iam-users`: fixed error from zipmap in outputs when a user gets deleted
   from user list
 * `tf-cloud-credential`: minor interpolation cleanup, added module to tests
-* `setup-meta-infrastructure`: Parameterize password length and age for iam password policy.
+* `setup-meta-infrastructure`: Parameterize password length and age for iam
+  password policy.
 * `iam-instance-profile`: Add role ID ouput for IAM instance profile module.
 
 ### Examples
@@ -87,7 +103,6 @@
   You will need to _manually_ remove the conflicting route (which was created
   by the old inline route), for example in the AWS console, and then re-apply
   to add it back.
-* `tf-cloud-credentials`: Switches the module to use a datasource to lookup an existing TF Cloud workspace instead of trying to create one.
 
 ### Examples
 

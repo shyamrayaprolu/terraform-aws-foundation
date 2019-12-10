@@ -52,27 +52,50 @@ module "service-data" {
   iam_instance_profile_role_name = module.instance_profile.iam_role_name
 }
 
+resource "aws_eip" "eip" {
+  count = var.assign_eip ? 1 : 0
+}
+
+resource "aws_iam_role_policy_attachment" "associate_eip" {
+  role       = module.instance_profile.iam_role_name
+  policy_arn = aws_iam_policy.associate_eip_policy.arn
+}
+
+resource "aws_iam_policy" "associate_eip_policy" {
+  name   = "associate_address"
+  policy = data.aws_iam_policy_document.associate_eip_policy_doc.json
+}
+
+data "aws_iam_policy_document" "associate_eip_policy_doc" {
+  statement {
+    sid    = ""
+    effect = "Allow"
+    actions = [
+      "ec2:AssociateAddress"
+    ]
+    resources = ["*"]
+  }
+}
+
 # Create an ASG with just 1 EC2 instance
 module "server" {
   source = "../asg"
 
-  ami       = var.ami
-  azs       = [local.az]
-  elb_names = var.load_balancers
-  key_name  = var.key_name
+  ami                = var.ami
+  elb_names          = var.load_balancers
+  key_name           = var.key_name
   # The IAM Instance Profile w/ attach_ebs role
-  iam_profile   = module.instance_profile.iam_profile_id
-  instance_type = var.instance_type
-  # 1 EC2 instance <> 1 EBS volume 
-  max_nodes       = 1
-  min_nodes       = 1
-  placement_group = var.placement_group
-  public_ip       = var.public_ip
+  iam_profile        = module.instance_profile.iam_profile_id
+  instance_type      = var.instance_type
+  # 1 EC2 instance <> 1 EBS volume
+  max_nodes          = 1
+  min_nodes          = 1
+  placement_group    = var.placement_group
+  public_ip          = var.public_ip
   # the prefix and suffix names are combined in
   # the `asg` module to create the full name
-  name_prefix = var.name_prefix
-  name_suffix = "${var.name_suffix}-${local.az}"
-
+  name_prefix        = var.name_prefix
+  name_suffix        = "${var.name_suffix}-${local.az}"
   root_volume_type   = var.root_volume_type
   root_volume_size   = var.root_volume_size
   security_group_ids = var.security_group_ids
@@ -80,7 +103,12 @@ module "server" {
 
   user_data = <<END_INIT
 #!/bin/bash
+apt update
 ${var.init_prefix}
+${module.init-install-awscli.init_snippet}
+while ! ${var.assign_eip ? "aws ec2 associate-address --instance-id \"$(ec2metadata --instance-id)\" --region \"${var.region}\" --allocation-id \"${element(aws_eip.eip.*.id, 0)}\"" : "true"}; do
+  sleep 1
+done
 ${module.init-attach-ebs.init_snippet}
 ${var.init_suffix}
 END_INIT
@@ -89,7 +117,13 @@ END_INIT
 
 # Render init snippet - boxed module to attach the EBS volume to the node
 module "init-attach-ebs" {
-  source = "../init-snippet-attach-ebs-volume"
-  region = var.region
+  source    = "../init-snippet-attach-ebs-volume"
+  region    = var.region
   volume_id = module.service-data.volume_id
 }
+
+module "init-install-awscli" {
+  source = "../init-snippet-install-awscli"
+}
+
+
