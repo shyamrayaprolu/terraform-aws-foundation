@@ -12,9 +12,16 @@ variable "security_group_id" {
   type        = string
 }
 
+variable "source_security_group_id" {
+  type        = string
+  description = "The security group id to allow access from. Cannot be specified with cidr_blocks and self."
+  default     = ""
+}
+
 variable "cidr_blocks" {
-  description = "List of CIDR block ranges that the SG allows ingress from"
+  description = "List of CIDR blocks to allow access from. Cannot be specified with source_security_group_id."
   type        = list(string)
+  default     = []
 }
 
 variable "description" {
@@ -40,30 +47,56 @@ variable "udp" {
 }
 
 locals {
-  tcp = "${var.tcp ? 1 : 0}"
-  udp = "${var.udp ? 1 : 0}"
+  tcp       = "${var.tcp ? 1 : 0}"
+  udp       = "${var.udp ? 1 : 0}"
+  by_cidr   = length(var.cidr_blocks) == 0 ? 0 : 1
+  by_src_sg = var.source_security_group_id == "" ? 0 : 1
 }
 
 # ingress rule for tcp, if enabled
-resource "aws_security_group_rule" "tcp_ingress" {
-  count             = local.tcp
+resource "aws_security_group_rule" "tcp_ingress_cidr" {
+  count             = local.tcp * local.by_cidr
   type              = "ingress"
   description       = "${var.description} (tcp)"
   from_port         = var.port
   to_port           = var.port
   protocol          = "tcp"
-  cidr_blocks       = var.cidr_blocks
   security_group_id = var.security_group_id
+  cidr_blocks       = var.cidr_blocks
 }
 
 # ingress rule for udp, if enabled
-resource "aws_security_group_rule" "udp_ingress" {
-  count             = local.udp
+resource "aws_security_group_rule" "udp_ingress_cidr" {
+  count             = local.udp * local.by_cidr
   type              = "ingress"
   description       = "${var.description} (udp)"
   from_port         = var.port
   to_port           = var.port
   protocol          = "udp"
-  cidr_blocks       = var.cidr_blocks
   security_group_id = var.security_group_id
+  cidr_blocks       = var.cidr_blocks
+}
+
+# ingress rule for tcp, if enabled
+resource "aws_security_group_rule" "tcp_ingress_src_sg" {
+  count                    = local.tcp * local.by_src_sg
+  type                     = "ingress"
+  description              = "${var.description} (tcp)"
+  from_port                = var.port
+  to_port                  = var.port
+  protocol                 = "tcp"
+  security_group_id        = var.security_group_id
+  source_security_group_id = var.source_security_group_id
+}
+
+# ingress rule for udp, if enabled
+resource "aws_security_group_rule" "udp_ingress_src_sg" {
+  count                    = local.udp * local.by_src_sg
+  type                     = "ingress"
+  description              = "${var.description} (udp)"
+  from_port                = var.port
+  to_port                  = var.port
+  protocol                 = "udp"
+  security_group_id        = var.security_group_id
+  source_security_group_id = var.source_security_group_id
 }
